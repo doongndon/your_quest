@@ -1,0 +1,216 @@
+# 맵 하나를 그리고, 주인공을 칸 단위로 움직이고, 말 걸기/문 이동을 처리한다.
+extends Node2D
+
+const Maps := preload("res://data/maps.gd")
+const Day1 := preload("res://scripts/day1.gd")
+const TILES_TEX := preload("res://assets/sprites/tiles.png")
+const OBJ_TEX := preload("res://assets/sprites/objects.png")
+const T := 16
+const STEP_TIME := 0.17
+const DIRS := {"down": Vector2i.DOWN, "left": Vector2i.LEFT, "right": Vector2i.RIGHT, "up": Vector2i.UP}
+const ROW := {"down": 0, "left": 1, "right": 2, "up": 3}  # player.png 의 줄 순서
+
+var data: Dictionary
+var rows: Array
+var size_cells: Vector2i
+var things := {}   # 칸 -> {"id", "ch", "walk", "sprite"}
+var npcs: Array[Sprite2D] = []
+var player := Sprite2D.new()
+var cell: Vector2i
+var facing := "down"
+var moving := false
+var acting := false
+var marker := Sprite2D.new()
+var _step_count := 0
+
+
+func _ready() -> void:
+	data = Maps.MAPS[Game.map]
+	rows = data.rows
+	size_cells = Vector2i(rows[0].length(), rows.size())
+	for y in size_cells.y:
+		assert(rows[y].length() == size_cells.x, "맵 줄 길이가 다름: %s %d줄" % [Game.map, y])
+		for x in size_cells.x:
+			_place(rows[y][x], Vector2i(x, y))
+
+	player.texture = preload("res://assets/sprites/player.png")
+	player.hframes = 4
+	player.vframes = 4
+	player.centered = false
+	add_child(player)
+	cell = _find("P")
+	if Game.arrive:
+		cell = _find(Game.arrive) + _arrive_offset()
+		facing = "down" if _arrive_offset().y > 0 else "up"
+	_snap()
+
+	marker.texture = OBJ_TEX
+	marker.hframes = 16
+	marker.vframes = 2
+	marker.frame = 13
+	marker.centered = false
+	add_child(marker)
+	var bob := create_tween().set_loops()
+	bob.tween_property(marker, "offset:y", -3.0, 0.4)
+	bob.tween_property(marker, "offset:y", 0.0, 0.4)
+
+	var cam := Camera2D.new()
+	var px := size_cells * T
+	if px.x <= 320 and px.y <= 180:
+		cam.position = Vector2(px) / 2  # 방 하나가 화면에 다 들어오면 고정
+		add_child(cam)
+	else:
+		cam.position = Vector2(8, 8)
+		cam.limit_right = px.x
+		cam.limit_bottom = px.y
+		player.add_child(cam)
+	cam.limit_left = 0
+	cam.limit_top = 0
+
+	Game.play_bgm(data.bgm, 0.96 if Game.step >= 4 else 1.0)
+	UI.hud(true)
+	refresh()
+	Day1.on_enter(self)
+
+
+func _place(ch: String, c: Vector2i) -> void:
+	var def: Dictionary = Maps.THINGS.get(ch, {})
+	if def.is_empty():
+		return
+	var s: Sprite2D
+	if def.has("npc"):
+		s = Sprite2D.new()
+		s.texture = load("res://assets/sprites/%s.png" % def.npc)
+		s.hframes = 2
+		npcs.append(s)
+	elif def.has("frame"):
+		s = Sprite2D.new()
+		s.texture = OBJ_TEX
+		s.hframes = 16
+		s.vframes = 2
+		s.frame = def.frame
+	if s:
+		s.centered = false
+		s.position = c * T
+		add_child(s)
+	things[c] = {"id": def.id, "ch": ch, "walk": def.get("walk", false), "sprite": s}
+
+
+func _draw() -> void:
+	for y in size_cells.y:
+		for x in size_cells.x:
+			var ch: String = rows[y][x]
+			if not Maps.TILES.has(ch):
+				ch = Maps.THINGS[ch].get("base", data.floor)
+			draw_texture_rect_region(TILES_TEX, Rect2(x * T, y * T, T, T), Rect2(Maps.TILES[ch][0] * T, 0, T, T))
+
+
+func _process(_delta: float) -> void:
+	var t := Time.get_ticks_msec() / 1000.0
+	for n in npcs:  # 조잡한 2프레임 숨쉬기 (ISTRUE 는 가끔만 눈이 바뀜)
+		n.frame = int(fmod(t, 3.7) < 0.2) if "istrue" in n.texture.resource_path else int(t * 2) % 2
+	if moving or acting or UI.busy:
+		return
+	for d in DIRS:
+		if Input.is_action_pressed(d):
+			_walk(d)
+			break
+
+
+# 대화창이 먼저 키를 가져가므로, 여기엔 대화 중이 아닐 때 누른 키만 온다
+func _unhandled_input(e: InputEvent) -> void:
+	if moving or acting or UI.busy:
+		return
+	if e.is_action_pressed("accept"):
+		_interact()
+	elif e.is_action_pressed("map"):
+		Day1.open_map()
+
+
+func _walk(d: String) -> void:
+	facing = d
+	player.frame = ROW[d] * 4 + _step_count % 2 * 2
+	var to: Vector2i = cell + DIRS[d]
+	var th: Dictionary = things.get(to, {})
+	if not _walkable(to):
+		return
+	moving = true
+	if th.get("id", "").begins_with("door"):
+		acting = true
+		var ok: bool = await Day1.door(th.ch)
+		acting = false
+		if not ok:
+			moving = false
+			return
+	player.frame = ROW[d] * 4 + (_step_count * 2 + 1) % 4
+	var tw := create_tween()
+	tw.tween_property(player, "position", Vector2(to * T), STEP_TIME)
+	await tw.finished
+	_step_count += 1
+	cell = to
+	player.frame = ROW[d] * 4 + (_step_count * 2) % 4
+	UI.player_cell = cell
+	if data.links.has(th.get("ch", "")):
+		var link: Array = data.links[th.ch]
+		Game.sfx("sfx_door")
+		Game.go(link[0], link[1])
+		return
+	moving = false
+
+
+func _walkable(c: Vector2i) -> bool:
+	if c.x < 0 or c.y < 0 or c.x >= size_cells.x or c.y >= size_cells.y:
+		return false
+	if things.has(c):
+		return things[c].walk
+	return not Maps.TILES[rows[c.y][c.x]][1]
+
+
+func _interact() -> void:
+	var front: Vector2i = cell + DIRS[facing]
+	var th: Dictionary = things.get(front, {})
+	if th.get("id") == "counter":  # 계산대 너머에 있는 사람에게 말 걸기
+		th = things.get(front + DIRS[facing], {})
+	if th.is_empty() or th.id == "spawn":
+		return
+	acting = true
+	await Day1.interact(th.id, self)
+	acting = false
+
+
+func _find(ch: String) -> Vector2i:
+	for c in things:
+		if things[c].ch == ch:
+			return c
+	return Vector2i(size_cells / 2)
+
+
+func _arrive_offset() -> Vector2i:
+	for m in Maps.MAPS.values():
+		for k in m.links:
+			if m.links[k][0] == Game.map and m.links[k][1] == Game.arrive:
+				return m.links[k][2]
+	return Vector2i.DOWN
+
+
+func _snap() -> void:
+	player.position = cell * T
+	player.frame = ROW[facing] * 4
+	UI.player_cell = cell
+
+
+# 물건 모양 바꾸기 (예: 커튼 열림 -> 닫힘)
+func set_frame(id: String, frame: int) -> void:
+	for th in things.values():
+		if th.id == id and th.sprite:
+			th.sprite.frame = frame
+
+
+# 목표 위에 빨간 화살표 띄우기
+func refresh() -> void:
+	var target: String = Day1.marker_char()
+	marker.visible = false
+	for c in things:
+		if things[c].ch == target:
+			marker.position = (c + Vector2i.UP) * T
+			marker.visible = true
