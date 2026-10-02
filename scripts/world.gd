@@ -2,11 +2,13 @@
 extends Node2D
 
 const Maps := preload("res://data/maps.gd")
-const Day1 := preload("res://scripts/day1.gd")
+const Story := preload("res://scripts/story.gd")
 const TILES_TEX := preload("res://assets/sprites/tiles.png")
 const OBJ_TEX := preload("res://assets/sprites/objects.png")
 const T := 16
 const STEP_TIME := 0.17
+const RUN_TIME := 0.09
+const DROWSY_TIME := 0.28
 const DIRS := {"down": Vector2i.DOWN, "left": Vector2i.LEFT, "right": Vector2i.RIGHT, "up": Vector2i.UP}
 const ROW := {"down": 0, "left": 1, "right": 2, "up": 3}  # player.png 의 줄 순서
 
@@ -21,6 +23,7 @@ var facing := "down"
 var moving := false
 var acting := false
 var marker := Sprite2D.new()
+var cam := Camera2D.new()
 var _step_count := 0
 
 
@@ -54,7 +57,6 @@ func _ready() -> void:
 	bob.tween_property(marker, "offset:y", -3.0, 0.4)
 	bob.tween_property(marker, "offset:y", 0.0, 0.4)
 
-	var cam := Camera2D.new()
 	var px := size_cells * T
 	if px.x <= 320 and px.y <= 180:
 		cam.position = Vector2(px) / 2  # 방 하나가 화면에 다 들어오면 고정
@@ -67,10 +69,12 @@ func _ready() -> void:
 	cam.limit_left = 0
 	cam.limit_top = 0
 
-	Game.play_bgm(data.bgm, 0.96 if Game.step >= 4 else 1.0)
+	Game.play_bgm(data.bgm)
+	if Game.flags.get("drowsy"):
+		set_drowsy()
 	UI.hud(true)
 	refresh()
-	Day1.on_enter(self)
+	Story.on_enter(self)
 
 
 func _place(ch: String, c: Vector2i) -> void:
@@ -124,7 +128,7 @@ func _unhandled_input(e: InputEvent) -> void:
 	if e.is_action_pressed("accept"):
 		_interact()
 	elif e.is_action_pressed("map"):
-		Day1.open_map()
+		Story.open_map()
 
 
 func _walk(d: String) -> void:
@@ -135,26 +139,32 @@ func _walk(d: String) -> void:
 	if not _walkable(to):
 		return
 	moving = true
-	if th.get("id", "").begins_with("door"):
+	var link: Array = data.links.get(th.get("ch", ""), [])
+	if link:
 		acting = true
-		var ok: bool = await Day1.door(th.ch)
+		var ok: bool = await Story.door(th.ch)
 		acting = false
 		if not ok:
 			moving = false
 			return
 	player.frame = ROW[d] * 4 + (_step_count * 2 + 1) % 4
 	var tw := create_tween()
-	tw.tween_property(player, "position", Vector2(to * T), STEP_TIME)
+	var time := STEP_TIME
+	if Game.flags.get("drowsy"):
+		time = DROWSY_TIME
+	elif Input.is_action_pressed("run"):
+		time = RUN_TIME
+	tw.tween_property(player, "position", Vector2(to * T), time)
 	await tw.finished
 	_step_count += 1
 	cell = to
 	player.frame = ROW[d] * 4 + (_step_count * 2) % 4
 	UI.player_cell = cell
-	if data.links.has(th.get("ch", "")):
-		var link: Array = data.links[th.ch]
+	if link:
 		Game.sfx("sfx_door")
 		Game.go(link[0], link[1])
 		return
+	await Story.on_step(self)
 	moving = false
 
 
@@ -174,7 +184,7 @@ func _interact() -> void:
 	if th.is_empty() or th.id == "spawn":
 		return
 	acting = true
-	await Day1.interact(th.id, self)
+	await Story.interact(th.id, self)
 	acting = false
 
 
@@ -208,9 +218,23 @@ func set_frame(id: String, frame: int) -> void:
 
 # 목표 위에 빨간 화살표 띄우기
 func refresh() -> void:
-	var target: String = Day1.marker_char()
+	var target: String = Story.marker_char()
 	marker.visible = false
 	for c in things:
 		if things[c].ch == target:
 			marker.position = (c + Vector2i.UP) * T
 			marker.visible = true
+
+
+# 졸릴 때: 세상이 어둑해진다 (화면 위 글씨는 그대로)
+func set_drowsy() -> void:
+	var m := CanvasModulate.new()
+	m.color = Color(0.72, 0.68, 0.82)
+	add_child(m)
+
+
+func shake() -> void:
+	var tw := create_tween()
+	for i in 8:
+		tw.tween_property(cam, "offset", Vector2(randi_range(-4, 4), randi_range(-3, 3)), 0.04)
+	tw.tween_property(cam, "offset", Vector2.ZERO, 0.04)

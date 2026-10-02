@@ -4,6 +4,7 @@ extends RefCounted
 
 const GUIDE := "???"
 const SHOP := "ISTRUE"
+const NIGHT_WHISPER := "내일 또 와"
 const QUESTS := [["curtain", "커튼 치기"], ["window", "창문 열기"], ["bed", "이불 정리하기"]]
 
 
@@ -17,12 +18,14 @@ static func objectives() -> Array:
 		_: return [["침대에서 자기", false]]
 
 
-static func marker_char() -> String:
-	return {3: "S", 4: "H"}.get(Game.step, "")
+static func marker_char() -> String: return {3: "S", 4: "H"}.get(Game.step, "")
+static func whispers_on() -> bool: return Game.step >= 1 and Game.step <= 4
+static func map_ready() -> bool: return Game.step >= 3
+static func can_sleep() -> bool: return Game.step == 5
+static func on_step(_world) -> void: pass
 
 
 static func on_enter(world) -> void:
-	Game.whispers(Game.step >= 1 and Game.step <= 4)
 	if Game.map == "home" and Game.step == 0 and not Game.flags.get("hello"):
 		Game.flags.hello = true
 		await world.get_tree().create_timer(0.6).timeout
@@ -33,13 +36,6 @@ static func on_enter(world) -> void:
 		Game.whisper_now("여기 아니야")
 
 
-static func open_map() -> void:
-	if Game.step < 3:
-		UI.toast("아직 지도가 없다.")
-	else:
-		UI.open_map()
-
-
 # 문에 들어가도 되는지. 안 되면 이유를 말해 준다.
 static func door(ch: String) -> bool:
 	if Game.map == "home" and ch == "D" and Game.step < 3:
@@ -48,41 +44,36 @@ static func door(ch: String) -> bool:
 	return true
 
 
-static func interact(id: String, world) -> void:
+# 처리했으면 true. false 면 story.gd 의 기본 설명이 나온다.
+static func interact(id: String, world) -> bool:
 	var f := Game.flags
 	match id:
 		"guide": await _guide(world)
-		"istrue": await _istrue(world)
+		"istrue":
+			if Game.step != 3:
+				return false
+			await _istrue(world)
 		"curtain":
-			if Game.step == 1 and not f.get("curtain"):
-				world.set_frame("curtain", 1)
-				await _quest_done("curtain", world)
-			else:
-				await UI.say("", ["커튼이 쳐져 있다." if f.get("curtain") else "커튼이 열려 있다. 햇빛이 눈부시다."])
+			if Game.step != 1 or f.get("curtain"):
+				return false
+			world.set_frame("curtain", 1)
+			await _quest_done("curtain", world)
 		"window":
-			if Game.step == 1 and not f.get("window"):
-				world.set_frame("window", 3)
-				await _quest_done("window", world)
-				await world.get_tree().create_timer(0.8).timeout
-				Game.whisper_now("...거기 있어?")
-				await world.get_tree().create_timer(1.6).timeout
-				await UI.say("", ["...방금 뭔가 들린 것 같다.", "버그인가?"])
-			else:
-				await UI.say("", ["창문이 열려 있다. 바람이 조금 분다." if f.get("window") else "창문이 닫혀 있다."])
+			if Game.step != 1 or f.get("window"):
+				return false
+			world.set_frame("window", 3)
+			await _quest_done("window", world)
+			await world.get_tree().create_timer(0.8).timeout
+			Game.whisper_now("...거기 있어?")
+			await world.get_tree().create_timer(1.6).timeout
+			await UI.say("", ["...방금 뭔가 들린 것 같다.", "버그인가?"])
 		"bed":
-			if Game.step == 1 and not f.get("bed"):
-				world.set_frame("bed", 5)
-				await _quest_done("bed", world)
-			elif Game.step == 5:
-				if await UI.choose("", "잘까?", ["잔다", "아직"]) == 0:
-					await _end_day(world)
-			else:
-				await UI.say("", ["이불이 깔끔하다." if f.get("bed") else "이불이 엉망이다."])
-		"table": await UI.say("", ["책상이다. 위에 아무것도 없다.", "...아직 안 만든 것 같다."])
-		"plant": await UI.say("", ["화분이다. 잎이 조금 네모나다."])
-		"sign": await UI.say("", ["[ tHE shop ]", "글자가 이상하게 쓰여 있다."])
-		"shelf_candy": await UI.say("", ["알록달록한 사탕이 있다."])
-		"shelf_hammer": await UI.say("", ["망치가 있다.", "...슈퍼에 왜 망치가 있지?"])
+			if Game.step != 1 or f.get("bed"):
+				return false
+			world.set_frame("bed", 5)
+			await _quest_done("bed", world)
+		_: return false
+	return true
 
 
 static func _quest_done(key: String, world) -> void:
@@ -131,9 +122,6 @@ static func _guide(world) -> void:
 
 
 static func _istrue(world) -> void:
-	if Game.step != 3:
-		await UI.say(SHOP, ["또 왔네.", "오늘은 더 팔 게 없어. 내일 와."])
-		return
 	if not Game.flags.get("met_istrue"):
 		Game.flags.met_istrue = true
 		await UI.say(SHOP, ["어서 와.", "tHE shop에 온 걸 환영해.", "어서 와."])
@@ -156,18 +144,3 @@ static func _istrue(world) -> void:
 			_:
 				await UI.say(SHOP, ["또 와."])
 				return
-
-
-static func _end_day(world) -> void:
-	Game.whispers(false)
-	Game.stop_bgm()
-	await UI.fade(true, 1.2)
-	UI.hud(false)
-	await UI.card("1일차 끝", 1.6)
-	Game.whisper_now("내일 또 와")
-	await world.get_tree().create_timer(2.5).timeout
-	await UI.card("2일차는 아직 만드는 중이에요.\n플레이해 줘서 고마워요!", 2.4)
-	Game.best_day = maxi(Game.best_day, 1)
-	Game.save_game()
-	world.get_tree().change_scene_to_file("res://scenes/title.tscn")
-	UI.fade(false, 0.8)

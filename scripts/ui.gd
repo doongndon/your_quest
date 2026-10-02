@@ -4,10 +4,11 @@ extends CanvasLayer
 signal _next
 signal _picked(i: int)
 
-const Day1 := preload("res://scripts/day1.gd")
+const Story := preload("res://scripts/story.gd")
 const Maps := preload("res://data/maps.gd")
 const FONT := preload("res://assets/fonts/Galmuri9.ttf")
 const OBJ := preload("res://assets/sprites/objects.png")
+const MAP_LABELS := {"S": "tHE shop", "H": "집", "G": "운동장"}
 const TYPE_SPEED := 40.0  # 초당 글자 수
 const TILE_COLORS := [Color("c800c8"), Color("6eb464"), Color("d6be8c"), Color("b07c52"), Color("ecdec4"),
 	Color("346e40"), Color("c8aa8c"), Color("be5046"), Color("c8c8d0"), Color("6eb464"), Color("82583c")]
@@ -252,7 +253,7 @@ func hud(on: bool) -> void:
 
 func refresh() -> void:
 	var text := ""
-	for q in Day1.objectives():
+	for q in Story.objectives():
 		text += ("■ " if q[1] else "□ ") + q[0] + "\n"
 	_quests.text = text
 	_gold.text = str(Game.gold) + "G"
@@ -326,8 +327,8 @@ func _draw_map() -> void:
 			var t: Array = Maps.TILES.get(ch, Maps.TILES.get(Maps.THINGS.get(ch, {}).get("base", ","), [1]))
 			var col: Color = Color("a07040") if ch in "HS" else TILE_COLORS[t[0]]
 			_map.draw_rect(Rect2(origin + Vector2(x, y) * cell, Vector2(cell, cell)), col)
-			if ch == "S" and Game.step >= 3:
-				_map.draw_texture_rect(icon(13), Rect2(origin + Vector2(x, y - 2) * cell, Vector2(12, 12)), false)
-				_map.draw_string(FONT, origin + Vector2(x - 3, y - 2) * cell, "tHE shop", HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
+			if ch == Story.marker_char():
+				_map.draw_texture_rect(icon(13), Rect2(origin + Vector2(x - 0.5, y - 2) * cell, Vector2(12, 12)), false)
+				_map.draw_string(FONT, origin + Vector2(x + 1.5, y - 0.6) * cell, MAP_LABELS.get(ch, ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
 	if Game.map == "town":
 		_map.draw_rect(Rect2(origin + Vector2(player_cell) * cell + Vector2(1, 1), Vector2(4, 4)), Color("2b7bff"))

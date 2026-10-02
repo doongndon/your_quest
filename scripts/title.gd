@@ -1,7 +1,7 @@
 # 타이틀 화면. 가짜 게임 정보(플레이 0, 후기 0)를 보여 주고 시작한다.
 extends Control
 
-var _menu := ["시작하기", "종료"]
+var _menu := ["처음부터", "종료"]
 var _sel := 0
 var _items: Array[Label] = []
 var _started := false
@@ -17,7 +17,9 @@ func _ready() -> void:
 	add_child(bg)
 	_label("YOUR QUEST", Vector2(0, 40), 20, Color("f0ece4"), preload("res://assets/fonts/Galmuri11.ttf"))
 	_label("v0.1  (미완성)", Vector2(0, 66), 10, Color("8a8aa0"))
-	_label("플레이 수 0명  ·  후기 0개" if Game.best_day == 0 else "1일차 클리어!", Vector2(0, 162), 10, Color("5a5a70"))
+	if Game.best_day > 0:
+		_menu.push_front("이어하기 (%d일차)" % Game.day)
+	_label("플레이 수 0명  ·  후기 0개" if Game.best_day == 0 else "%d일차 클리어!" % Game.best_day, Vector2(0, 162), 10, Color("5a5a70"))
 	for i in _menu.size():
 		_items.append(_label("", Vector2(0, 100 + i * 16), 10, Color.WHITE))
 	_redraw()
@@ -53,11 +55,11 @@ func _unhandled_input(e: InputEvent) -> void:
 		_redraw()
 	elif e.is_action_pressed("accept"):
 		Game.sfx("sfx_select")
-		if _sel == 1:
-			get_tree().quit()
-			return
 		_started = true
-		_intro()
+		match _menu[_sel]:
+			"종료": get_tree().quit()
+			"처음부터": _intro()
+			_: _continue()
 
 
 func _intro() -> void:
@@ -67,3 +69,10 @@ func _intro() -> void:
 	await UI.card("퀘스트를 깨기만 하면 되는 게임.\n플레이 수 0명, 후기 0개.", 1.8)
 	await UI.card("...그래도 재미있어 보였다.", 1.4)
 	Game.new_game()
+
+
+func _continue() -> void:
+	Game.stop_bgm()
+	await UI.fade(true, 0.6)
+	await UI.card("%d일차" % Game.day, 1.2)
+	Game.continue_game()

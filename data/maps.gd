@@ -26,6 +26,7 @@ const THINGS := {
 	"S": {"id": "door_shop", "frame": 6, "base": "E", "walk": true},
 	"N": {"id": "guide", "npc": "guide"},
 	"I": {"id": "istrue", "npc": "istrue"},
+	"G": {"id": "gate", "base": "=", "walk": true},  # 보이지 않는 출입구 (마을 <-> 운동장)
 	"P": {"id": "spawn", "walk": true},
 }
 
@@ -50,7 +51,8 @@ const MAPS := {
 	},
 	"town": {
 		"bgm": "bgm_town", "floor": ",",
-		"links": {"H": ["home", "D", Vector2i(0, -1)], "S": ["shop", "D", Vector2i(0, -1)]},
+		"links": {"H": ["home", "D", Vector2i(0, -1)], "S": ["shop", "D", Vector2i(0, -1)],
+			"G": ["field", "G", Vector2i(0, 1)]},
 		"rows": [
 			"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
 			"xYYYYYYYYYYYYYYYYYYYYYYYYYYYxx",
@@ -66,7 +68,37 @@ const MAPS := {
 			"xY,,*,,,,,,,,=,,,,,,,,,,,,,Yxx",
 			"xY,,,,,,,Y,,,=,,,*,,,,,,xxxYxx",
 			"xYYYYYYYYYYYY=YYYYYYYYYxxxxxxx",
-			"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"xxxxxxxxxxxxxGxxxxxxxxxxxxxxxx",
+		],
+	},
+	"field": {
+		"bgm": "bgm_field", "floor": ",",
+		"links": {"G": ["town", "G", Vector2i(0, -1)]},
+		"rows": [
+			"YYYYYYYYYYYYYYYYYYYGYYYYYYYYYYYYYYYYYYYY",
+			"Y,,,,,,,,,,,,,,,,,,=,,,,,,,,,,,,,,,,,,,Y",
+			"Y,,,,,,,,,,,,,,,,,,=,,,,,,,,,,,,,,,,,,,Y",
+			"Y,,,,,,,,,,,,,,,,,,=,,,,,,,,,,,,,,,,,,,Y",
+			"Y,,,================================,,,Y",
+			"Y,,==================================,,Y",
+			"Y,,==,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,==,,Y",
+			"Y,,==,,,,,,,,*,,,,,,,,*,,,*,,,,,,,,==,,Y",
+			"Y,,==,,,xxxx,,,,,,,,,,,,,,,,,,,,,,,==,,Y",
+			"Y,,==,,,xxxx,,,,,,,,,,,,,,,,,,,,,,,==,,Y",
+			"Y,,==,,,xxxx,,,,,,,,,,,,,,,,,**,,*,==,,Y",
+			"Y,,==,,,,,,,,FFF,FFF,FFF,FFF,,,,,,,==,,Y",
+			"Y,,==,,,,,,,,,,,,,,,,,,,,,xxx*,,,,,==,,Y",
+			"Y,,==,,,,,,,,,,,,,,,,,,,,,xxx,,,,,,==,,Y",
+			"Y,,==,,,,,,,,,,,,*,,,,,,,,xxx,,,*,,==,,Y",
+			"Y,,==,,,,,,,,,,xx,*,,,,,,,xxx,,,,,,==,,Y",
+			"Y,,==,,,,*,,,,,xx,,,,,,,,,,,,,,,,,,==,,Y",
+			"Y,,==,,,,,,,,,,,,,,,,,,,,,,,,,,*,,,==,,Y",
+			"Y,,==,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,==,,Y",
+			"Y,,==================================,,Y",
+			"Y,,,================================,,,Y",
+			"Y,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xY",
+			"Y,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,xxY",
+			"YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY",
 		],
 	},
 	"shop": {

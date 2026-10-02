@@ -292,6 +292,24 @@ objs = [curtain(False), curtain(True), window((150, 200, 240)), window((40, 40, 
 objs += [blank()] * (32 - len(objs))
 Image.fromarray(np.vstack([np.hstack(objs[:16]), np.hstack(objs[16:])])).save(os.path.join(SPR, "objects.png"))
 
+# ---------- "무언가": 32x32 (16x32 프레임 2개, 두번째는 지직거림) ----------
+def something(glitch):
+    a = np.zeros((32, 16, 4), np.uint8)
+    body = (12, 10, 18)
+    rect(a, 5, 2, 6, 7, body)             # 머리
+    rect(a, 4, 9, 8, 12, body)            # 몸
+    rect(a, 2, 10, 2, 13, body); rect(a, 12, 10, 2, 13, body)  # 긴 팔
+    rect(a, 4, 21, 3, 11, body); rect(a, 9, 21, 3, 11, body)   # 다리
+    rect(a, 6, 5, 1, 1, (255, 255, 255)); rect(a, 9, 5, 1, 1, (255, 255, 255))  # 눈
+    if glitch:
+        for y in (4, 12, 13, 22):
+            a[y] = np.roll(a[y], 3 if y % 2 else -3, axis=0)
+        a[5, 6] = a[5, 9] = (230, 40, 60, 255)
+    return a
+
+
+Image.fromarray(np.hstack([something(False), something(True)])).save(os.path.join(SPR, "something.png"))
+
 # ---------- 소리 (임시 칩튠) ----------
 SR = 22050
 
@@ -348,4 +366,8 @@ t = np.arange(int(SR * 2.2)) / SR
 noise = np.convolve(rng.normal(0, 1, t.size), np.ones(12) / 12, "same")
 save("sfx_whisper", noise * (.5 + .5 * np.sin(2 * np.pi * 5 * t) ** 2) * np.sin(np.pi * t / t[-1]) * .5)
 save("sfx_glitch", np.round(rng.normal(0, .5, int(SR * .15)) * 3) / 3 * .4)
+save("bgm_field", song([[60, 64, 67], [65, 69, 72], [60, 64, 67], [55, 59, 62]] * 2, 110, "sine", 4))
+t = np.arange(int(SR * .9)) / SR
+save("sfx_rush", (rng.normal(0, .6, t.size) * np.minimum(1, t * 3) + np.sign(np.sin(2 * np.pi * (60 + 200 * t) * t)) * .3)
+     * np.where(t < .75, 1, np.exp(-30 * (t - .75))))
 print("done")

@@ -5,7 +5,8 @@ const SAVE_PATH := "user://save.json"
 const WORLD := preload("res://scenes/world.tscn")
 
 var gold := 0
-var step := 0          # 이야기 진행 단계 (scripts/day1.gd 참고)
+var day := 1           # 지금 며칠째인지
+var step := 0          # 그날 이야기 진행 단계 (scripts/dayN.gd 참고)
 var flags := {}        # 퀘스트 완료 여부 등
 var items: Array[String] = []
 var map := "home"
@@ -50,6 +51,7 @@ func _setup_input() -> void:
 		"accept": [[KEY_Z, KEY_SPACE, KEY_ENTER], [JOY_BUTTON_A]],
 		"cancel": [[KEY_X, KEY_ESCAPE], [JOY_BUTTON_B]],
 		"map": [[KEY_M], [JOY_BUTTON_Y]],
+		"run": [[KEY_SHIFT], [JOY_BUTTON_X]],
 		"fullscreen": [[KEY_F11], []],
 	}
 	var axes := {"up": [JOY_AXIS_LEFT_Y, -1.0], "down": [JOY_AXIS_LEFT_Y, 1.0],
@@ -138,9 +140,20 @@ func go(to_map: String, door := "") -> void:
 
 func new_game() -> void:
 	gold = 0
+	items = []
+	start_day(1)
+	go("home")
+
+
+func start_day(n: int) -> void:
+	day = n
 	step = 0
 	flags = {}
-	items = []
+
+
+func continue_game() -> void:
+	load_save()
+	start_day(day)
 	go("home")
 
 
@@ -148,7 +161,7 @@ func new_game() -> void:
 func save_game() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"best_day": best_day}))
+		f.store_string(JSON.stringify({"best_day": best_day, "day": day, "gold": gold, "items": items}))
 
 
 func load_save() -> void:
@@ -157,3 +170,6 @@ func load_save() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if data is Dictionary:
 		best_day = int(data.get("best_day", 0))
+		day = clampi(int(data.get("day", 1)), 1, best_day + 1)
+		gold = int(data.get("gold", 0))
+		items.assign(data.get("items", []))
