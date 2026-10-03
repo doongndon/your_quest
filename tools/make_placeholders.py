@@ -330,9 +330,18 @@ def sofa():
     return rect(rect(a, 1, 14, 2, 2, (90, 60, 40)), 13, 14, 2, 2, (90, 60, 40))
 
 
+def weed():  # 줄기 1개에 가시 달린 길쭉한 잎 5장 (w = 가시)
+    return np.array(from_rows([
+        ".......w........", "......gg........", ".w....gg....w...", "..gg..gg...gg...",
+        "...gg.gg..gg....", "w...ggggggg...w.", ".gggggGGGggggg..", "......GG...w....",
+        ".....w.GG.......", ".......GG.......", ".......GG.......", ".......GG.......",
+        "......GGGG......", ".....hhhhhh.....", "................", "................",
+    ]))
+
+
 objs = [curtain(False), curtain(True), window((150, 200, 240)), window((40, 40, 60)), bed(False), bed(True),
         door(), counter(), shelf("candy"), shelf("hammer"), coin(), candy(), hammer(), marker(), table(), plant(),
-        sign(), candle(), pencils(), thread(), trapdoor(), box(), sofa()]
+        sign(), candle(), pencils(), thread(), trapdoor(), box(), sofa(), weed()]
 objs += [blank()] * (32 - len(objs))
 Image.fromarray(np.vstack([np.hstack(objs[:16]), np.hstack(objs[16:])])).save(os.path.join(SPR, "objects.png"))
 
@@ -415,3 +424,10 @@ t = np.arange(int(SR * .9)) / SR
 save("sfx_rush", (rng.normal(0, .6, t.size) * np.minimum(1, t * 3) + np.sign(np.sin(2 * np.pi * (60 + 200 * t) * t)) * .3)
      * np.where(t < .75, 1, np.exp(-30 * (t - .75))))
 print("done")
+
+# ---------- 앱 아이콘: 128x128 (휴대폰/웹에서 보이는 아이콘) ----------
+ic = Image.new("RGBA", (128, 128), (26, 26, 40, 255))
+face = Image.open(os.path.join(SPR, "guide.png")).crop((0, 0, 16, 16)).resize((112, 112), Image.NEAREST)
+ic.alpha_composite(face, (8, 12))
+ic.save(os.path.join(ROOT, "icon.png"))
+print("icon done")

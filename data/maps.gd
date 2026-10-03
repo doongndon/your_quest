@@ -39,6 +39,8 @@ const THINGS := {
 	"f": {"id": "sofa", "frame": 22},
 	"b": {"id": "guide_bed", "frame": 5},
 	"d": {"id": "guide_desk", "frame": 14},
+	# 마당 (4일차)
+	"v": {"id": "weed", "frame": 23},  # 잡초 (가시 달린 잎 5장)
 }
 
 # 문 연결: [이동할 맵, 도착할 문 글자, 문에서 몇 칸 떨어져 서는지]
@@ -146,6 +148,23 @@ const MAPS := {
 			"#k............#Q..o..QQ#",
 			"#......P......#Q.......#",
 			"######X#################",
+		],
+	},
+	"yard": {
+		"bgm": "bgm_field", "pitch": 0.85, "floor": ",",
+		"links": {"H": ["home", "", Vector2i(0, 1)]},
+		"rows": [
+			"RRRRRRRRRRRRRRRRRRRR",
+			"EEEEEEEEEHEEEEEEEEEE",
+			"F,,,,,,,,P,,,,,,,,,F",
+			"F,,v,,,,,,,,*,,,v,,F",
+			"F,,,,,*,,,,,,,,,,,,F",
+			"F,,,,,,,,v,,,,,,,,,F",
+			"F,v,,,,,,,,,,,,*,v,F",
+			"F,,,,,,,*,,,,,,,,,,F",
+			"F,,,*,,,,,,,v,,,,,,F",
+			"F,,,,,,,,,,,,,,,*,,F",
+			"FFFFFFFFFFFFFFFFFFFF",
 		],
 	},
 }

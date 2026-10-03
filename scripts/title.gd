@@ -10,6 +10,7 @@ var _started := false
 func _ready() -> void:
 	UI.hud(false)
 	Game.whispers(false)
+	Game.crackle(false)
 	Game.play_bgm("bgm_home", 0.9)
 	var bg := ColorRect.new()
 	bg.color = Color("1a1a28")

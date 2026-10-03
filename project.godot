@@ -8,6 +8,7 @@ config/name="Your Quest"
 config/version="0.1.0"
 run/main_scene="res://scenes/title.tscn"
 config/features=PackedStringArray("4.3")
+config/icon="res://assets/icon.png"
 
 [autoload]
 

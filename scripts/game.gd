@@ -16,11 +16,13 @@ var best_day := 0      # 저장: 끝낸 날 중 가장 큰 값
 var travelling := false  # 화면 전환 중 (이때는 못 움직인다)
 var whisper_lines := ["...들려?", "여기야", "ㄴr가", "...", "왜 왔어"]  # 그날 들리는 환청 (dayN.gd 의 WHISPERS)
 var whisper_gap := Vector2(25.0, 55.0)  # 환청 사이 간격(초) 최소~최대
+var crackle_gap := Vector2.ZERO  # 화면이 저절로 지직거리는 간격(초). ZERO = 안 함 (dayN.gd 의 CRACKLE)
 
 var _bgm := AudioStreamPlayer.new()
 var _bgm_name := ""
 var _sfx: Array[AudioStreamPlayer] = []
 var _whisper := Timer.new()
+var _crackle := Timer.new()
 
 
 func _ready() -> void:
@@ -35,6 +37,9 @@ func _ready() -> void:
 	add_child(_whisper)
 	_whisper.one_shot = true
 	_whisper.timeout.connect(_on_whisper)
+	add_child(_crackle)
+	_crackle.one_shot = true
+	_crackle.timeout.connect(_on_crackle)
 	load_save()
 
 
@@ -121,15 +126,30 @@ func whispers(on: bool) -> void:
 		_whisper.stop()
 
 
-func whisper_now(text := "") -> void:
-	sfx("sfx_whisper", -10.0)
-	UI.glitch(text if text else whisper_lines.pick_random())
+# sound = false 면 소리 없이 글씨만 (음소거된 환청)
+func whisper_now(text := "", sound := true) -> void:
+	if sound:
+		sfx("sfx_whisper", -10.0)
+	UI.glitch(text if text else whisper_lines.pick_random(), sound)
 
 
 func _on_whisper() -> void:
 	if not UI.busy:
 		whisper_now()
 	whispers(true)
+
+
+# ---------- 화면 지직거림 (4일차~) ----------
+func crackle(on: bool) -> void:
+	if on and crackle_gap != Vector2.ZERO and _crackle.is_stopped():
+		_crackle.start(randf_range(crackle_gap.x, crackle_gap.y))
+	elif not on:
+		_crackle.stop()
+
+
+func _on_crackle() -> void:
+	UI.static_noise(randf_range(0.08, 0.2), -20.0)
+	crackle(true)
 
 
 # ---------- 화면 전환 ----------

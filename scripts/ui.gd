@@ -10,7 +10,7 @@ const FONT := preload("res://assets/fonts/Galmuri9.ttf")
 const OBJ := preload("res://assets/sprites/objects.png")
 const MAP_LABELS := {"S": "tHE shop", "H": "집", "G": "운동장"}
 const TYPE_SPEED := 40.0  # 초당 글자 수
-const ITEM_ICONS := {"candy": 11, "hammer": 12, "candle": 17, "pencils": 18, "thread": 19}  # objects.png 칸 번호
+const ITEM_ICONS := {"candy": 11, "hammer": 12, "candle": 17, "pencils": 18, "thread": 19, "weed": 23}  # objects.png 칸 번호
 const TILE_COLORS := [Color("c800c8"), Color("6eb464"), Color("d6be8c"), Color("b07c52"), Color("ecdec4"),
 	Color("346e40"), Color("c8aa8c"), Color("be5046"), Color("c8c8d0"), Color("6eb464"), Color("82583c")]
 
@@ -36,6 +36,8 @@ var _card := Label.new()
 var _static := Control.new()  # 지직거리는 화면 (static_noise)
 var _static_left := 0.0
 var _map := Control.new()
+var _pad := Control.new()  # 휴대폰용 터치 버튼 (_setup_touch)
+var _touch_on := false
 var _typing := false
 var _choosing := -1  # 선택 중인 번호 (-1 = 선택 중 아님)
 var _options: Array = []
@@ -137,6 +139,7 @@ func _ready() -> void:
 	# (예전엔 환청 글씨가 페이드 밑에 있어서, 하루 끝 검은 화면의 환청이 안 보였다)
 	for n in [_noise, _whisper, _box, _more, _choice]:
 		_root.move_child(n, -1)
+	_setup_touch()
 
 
 func icon(frame: int) -> AtlasTexture:
@@ -169,6 +172,7 @@ func _process(delta: float) -> void:
 			Game.sfx("sfx_blip", -8.0)
 		_typing = _text.visible_characters < _text.get_total_character_count()
 	_more.visible = _box.visible and not _typing and _choosing < 0 and fmod(Time.get_ticks_msec() / 400.0, 2.0) < 1.4
+	_pad.visible = _touch_on and not (_box.visible and _choosing < 0)  # 대화 중엔 버튼 대신 화면 아무 데나 누르면 넘어간다
 	if _static.visible:
 		_static_left -= delta
 		_static.visible = _static_left > 0
@@ -176,6 +180,10 @@ func _process(delta: float) -> void:
 
 
 func _input(e: InputEvent) -> void:
+	if e is InputEventScreenTouch and e.pressed and _box.visible and _choosing < 0:
+		e = InputEventAction.new()  # 대화 중 화면 터치 = 확인
+		e.action = "accept"
+		e.pressed = true
 	if _choosing >= 0:
 		var d := int(e.is_action_pressed("down")) - int(e.is_action_pressed("up"))
 		if d:
@@ -288,8 +296,9 @@ func toast(text: String) -> void:
 	tw.tween_property(_toast, "modulate:a", 0.0, 0.4)
 
 
-func glitch(text: String) -> void:
-	Game.sfx("sfx_glitch", -12.0)
+func glitch(text: String, sound := true) -> void:
+	if sound:
+		Game.sfx("sfx_glitch", -12.0)
 	_whisper.text = text
 	_whisper.position = Vector2(randi_range(20, 250), randi_range(30, 110))
 	_noise.show()
@@ -311,20 +320,19 @@ func fade(to_black: bool, time := 0.35) -> void:
 	await tw.finished
 
 
-# 검은 화면에 큰 글씨 한 장. glitch 면 글씨가 가끔 일그러진다.
-func card(text: String, hold := 2.0, glitch := false) -> void:
+# 검은 화면에 큰 글씨 한 장. glitch 가 클수록 글씨가 자주, 심하게 일그러진다 (0 = 안 일그러짐)
+func card(text: String, hold := 2.0, glitch := 0.0) -> void:
 	busy = true
 	_card.text = text
 	_card.position = Vector2.ZERO
 	var tw := create_tween()
 	tw.tween_property(_card, "modulate", Color.WHITE, 0.6)
-	if glitch:
-		var bent := _bend(text)
+	if glitch > 0:
 		for i in int(hold / 0.1):
-			if i % 5 == 2 or i % 7 == 4:
+			if i % 5 == 2 or i % 7 == 4 or (glitch >= 2 and i % 3 != 0):
 				tw.tween_callback(func():
-					_card.text = bent
-					_card.position = Vector2(randi_range(-3, 3), randi_range(-1, 1))
+					_card.text = _bend(text, 0.3 * glitch)
+					_card.position = Vector2(randi_range(-3, 3), randi_range(-1, 1)) * glitch
 					_card.modulate = Color(1, 0.55, 0.6) if randf() < 0.5 else Color(0.6, 0.8, 1)
 					Game.sfx("sfx_glitch", -16.0))
 			else:
@@ -342,11 +350,11 @@ func card(text: String, hold := 2.0, glitch := false) -> void:
 	busy = false
 
 
-# 글자 몇 개를 깨진 글자로 바꾼다
-func _bend(text: String) -> String:
+# 글자 몇 개를 깨진 글자로 바꾼다 (amount = 바뀔 확률)
+func _bend(text: String, amount := 0.3) -> String:
 	var out := ""
 	for ch in text:
-		out += ["#", "ㅁ", "?", "_", "ㄹ"].pick_random() if ch != " " and ch != "\n" and randf() < 0.3 else ch
+		out += ["#", "ㅁ", "?", "_", "ㄹ", "ㄷ", "%"].pick_random() if ch != " " and ch != "\n" and randf() < amount else ch
 	return out
 
 
@@ -370,8 +378,8 @@ func loading(time := 2.0) -> void:
 
 
 # 화면이 지직거린다 (가로 줄무늬 + 점). 게임 화면 위, 대화창 아래에 그려진다.
-func static_noise(time := 0.4) -> void:
-	Game.sfx("sfx_glitch", -6.0)
+func static_noise(time := 0.4, volume_db := -6.0) -> void:
+	Game.sfx("sfx_glitch", volume_db)
 	_static_left = time
 	_static.show()
 	_static.queue_redraw()
@@ -410,3 +418,58 @@ func _draw_map() -> void:
 				_map.draw_string(FONT, origin + Vector2(x + 1.5, y - 0.6) * cell, MAP_LABELS.get(ch, ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
 	if Game.map == "town":
 		_map.draw_rect(Rect2(origin + Vector2(player_cell) * cell + Vector2(1, 1), Vector2(4, 4)), Color("2b7bff"))
+
+
+# ---------- 휴대폰 터치 버튼 ----------
+# 터치 화면에서만 보인다. PC 에서 보려면 실행 인자에 -- --touch
+func _setup_touch() -> void:
+	_touch_on = DisplayServer.is_touchscreen_available() or OS.has_feature("mobile") or "--touch" in OS.get_cmdline_user_args()
+	_pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pad.visible = _touch_on
+	_root.add_child(_pad)
+	_root.move_child(_pad, -1)
+	# [글씨, 동작, 위치, 크기, 누르고 있는 동안만?(false = 누를 때마다 켜고 끄기)]
+	for b in [["▲", "up", Vector2(24, 112), Vector2(20, 20), true], ["▼", "down", Vector2(24, 152), Vector2(20, 20), true],
+			["◀", "left", Vector2(4, 132), Vector2(20, 20), true], ["▶", "right", Vector2(44, 132), Vector2(20, 20), true],
+			["A", "accept", Vector2(292, 116), Vector2(24, 24), true], ["B", "cancel", Vector2(266, 136), Vector2(24, 24), true],
+			["지도", "map", Vector2(282, 92), Vector2(34, 16), true], ["달리기", "run", Vector2(4, 90), Vector2(36, 16), false]]:
+		_pad.add_child(_touch_button(b))
+
+
+func _touch_button(b: Array) -> Button:
+	var btn := Button.new()  # 글씨는 Button.text 대신 Label 로 (화살표 글자 때문에 버튼이 커지지 않게)
+	btn.position = b[2]
+	btn.size = b[3]
+	var l := Label.new()
+	l.text = b[0]
+	l.size = b[3]
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+	btn.add_child(l)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.toggle_mode = not b[4]
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		var st := StyleBoxFlat.new()
+		st.bg_color = Color(1, 1, 1, 0.35 if state.begins_with("pressed") or state == "hover_pressed" else 0.18)
+		st.border_color = Color(1, 1, 1, 0.45)
+		st.set_border_width_all(1)
+		st.set_corner_radius_all(4)
+		st.set_content_margin_all(0)
+		btn.add_theme_stylebox_override(state, st)
+	if b[4]:
+		btn.button_down.connect(_touch_action.bind(b[1], true))
+		btn.button_up.connect(_touch_action.bind(b[1], false))
+	else:
+		btn.toggled.connect(func(on: bool): _touch_action(b[1], on))
+	return btn
+
+
+# 키보드 키를 누른 것처럼 동작 이벤트를 보낸다
+func _touch_action(action: String, pressed: bool) -> void:
+	var e := InputEventAction.new()
+	e.action = action
+	e.pressed = pressed
+	Input.parse_input_event(e)

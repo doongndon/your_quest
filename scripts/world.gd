@@ -72,7 +72,10 @@ func _ready() -> void:
 
 	add_child(tint)
 	set_tint()
-	Game.play_bgm(data.bgm, data.get("pitch", 1.0))
+	if Game.flags.get("night"):
+		Game.stop_bgm()
+	else:
+		Game.play_bgm(data.bgm, data.get("pitch", 1.0))
 	UI.hud(true)
 	refresh()
 	# 들어오자마자 나오는 이야기가 끝날 때까지는 못 움직인다 (대화가 겹치지 않게)
@@ -239,6 +242,19 @@ func face(d: String) -> void:
 	player.frame = ROW[d] * 4
 
 
+# 바라보는 칸
+func front() -> Vector2i:
+	return cell + DIRS[facing]
+
+
+# c 칸의 물건 하나만 없애기 (예: 잡초 뽑기). 지나갈 수 있게 된다.
+func remove_at(c: Vector2i) -> void:
+	if things.has(c):
+		if things[c].sprite:
+			things[c].sprite.visible = false
+		things[c].walk = true
+
+
 # 맵에 없던 캐릭터를 c 칸에 세운다. 길을 막고, 숨쉬기도 한다.
 func spawn_npc(npc: String, id: String, c: Vector2i) -> Sprite2D:
 	var s := Sprite2D.new()
@@ -268,6 +284,8 @@ func set_tint() -> void:
 	tint.color = Story.tint()
 	if Game.flags.get("drowsy"):
 		tint.color *= Color(0.72, 0.68, 0.82)
+	if Game.flags.get("night"):
+		tint.color *= Color(0.6, 0.66, 0.98)
 
 
 func shake() -> void:
