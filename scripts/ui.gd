@@ -10,6 +10,7 @@ const FONT := preload("res://assets/fonts/Galmuri9.ttf")
 const OBJ := preload("res://assets/sprites/objects.png")
 const MAP_LABELS := {"S": "tHE shop", "H": "집", "G": "운동장"}
 const TYPE_SPEED := 40.0  # 초당 글자 수
+const ITEM_ICONS := {"candy": 11, "hammer": 12, "candle": 17, "pencils": 18, "thread": 19}  # objects.png 칸 번호
 const TILE_COLORS := [Color("c800c8"), Color("6eb464"), Color("d6be8c"), Color("b07c52"), Color("ecdec4"),
 	Color("346e40"), Color("c8aa8c"), Color("be5046"), Color("c8c8d0"), Color("6eb464"), Color("82583c")]
 
@@ -32,6 +33,8 @@ var _whisper := Label.new()
 var _noise := ColorRect.new()
 var _fade := ColorRect.new()
 var _card := Label.new()
+var _static := Control.new()  # 지직거리는 화면 (static_noise)
+var _static_left := 0.0
 var _map := Control.new()
 var _typing := false
 var _choosing := -1  # 선택 중인 번호 (-1 = 선택 중 아님)
@@ -70,6 +73,7 @@ func _ready() -> void:
 	_outline(_gold)
 	_hud.add_child(_gold)
 	_bag.position = Vector2(262, 18)
+	_bag.add_theme_constant_override("separation", 0)
 	_hud.add_child(_bag)
 
 	# 대화창
@@ -110,6 +114,11 @@ func _ready() -> void:
 	_noise.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_noise.hide()
 	_root.add_child(_noise)
+	_static.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_static.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_static.draw.connect(_draw_static)
+	_static.hide()
+	_root.add_child(_static)
 	_map.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_map.draw.connect(_draw_map)
 	_map.hide()
@@ -124,8 +133,9 @@ func _ready() -> void:
 	_card.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_card.modulate.a = 0
 	_root.add_child(_card)
-	# 대화창이 카드/페이드 위에 보이도록 맨 위로
-	for n in [_box, _more, _choice]:
+	# 환청 글씨와 대화창이 카드/페이드 위에 보이도록 맨 위로
+	# (예전엔 환청 글씨가 페이드 밑에 있어서, 하루 끝 검은 화면의 환청이 안 보였다)
+	for n in [_noise, _whisper, _box, _more, _choice]:
 		_root.move_child(n, -1)
 
 
@@ -159,6 +169,10 @@ func _process(delta: float) -> void:
 			Game.sfx("sfx_blip", -8.0)
 		_typing = _text.visible_characters < _text.get_total_character_count()
 	_more.visible = _box.visible and not _typing and _choosing < 0 and fmod(Time.get_ticks_msec() / 400.0, 2.0) < 1.4
+	if _static.visible:
+		_static_left -= delta
+		_static.visible = _static_left > 0
+		_static.queue_redraw()
 
 
 func _input(e: InputEvent) -> void:
@@ -258,11 +272,12 @@ func refresh() -> void:
 	_quests.text = text
 	_gold.text = str(Game.gold) + "G"
 	for c in _bag.get_children():
-		c.queue_free()
+		c.free()
 	for item in Game.items:
 		var t := TextureRect.new()
-		t.texture = icon({"candy": 11, "hammer": 12}.get(item, 10))
+		t.texture = icon(ITEM_ICONS.get(item, 10))
 		_bag.add_child(t)
+	_bag.position.x = 316 - maxi(54, Game.items.size() * 16)  # 많아지면 왼쪽으로 늘어나게 (화면 밖으로 안 나가게)
 
 
 func toast(text: String) -> void:
@@ -296,16 +311,79 @@ func fade(to_black: bool, time := 0.35) -> void:
 	await tw.finished
 
 
-# 검은 화면에 큰 글씨 한 장
-func card(text: String, hold := 2.0) -> void:
+# 검은 화면에 큰 글씨 한 장. glitch 면 글씨가 가끔 일그러진다.
+func card(text: String, hold := 2.0, glitch := false) -> void:
 	busy = true
 	_card.text = text
+	_card.position = Vector2.ZERO
 	var tw := create_tween()
-	tw.tween_property(_card, "modulate:a", 1.0, 0.6)
-	tw.tween_interval(hold)
+	tw.tween_property(_card, "modulate", Color.WHITE, 0.6)
+	if glitch:
+		var bent := _bend(text)
+		for i in int(hold / 0.1):
+			if i % 5 == 2 or i % 7 == 4:
+				tw.tween_callback(func():
+					_card.text = bent
+					_card.position = Vector2(randi_range(-3, 3), randi_range(-1, 1))
+					_card.modulate = Color(1, 0.55, 0.6) if randf() < 0.5 else Color(0.6, 0.8, 1)
+					Game.sfx("sfx_glitch", -16.0))
+			else:
+				tw.tween_callback(func():
+					_card.text = text
+					_card.position = Vector2.ZERO
+					_card.modulate = Color.WHITE)
+			tw.tween_interval(0.1)
+	else:
+		tw.tween_interval(hold)
 	tw.tween_property(_card, "modulate:a", 0.0, 0.6)
 	await tw.finished
+	_card.text = text
+	_card.position = Vector2.ZERO
 	busy = false
+
+
+# 글자 몇 개를 깨진 글자로 바꾼다
+func _bend(text: String) -> String:
+	var out := ""
+	for ch in text:
+		out += ["#", "ㅁ", "?", "_", "ㄹ"].pick_random() if ch != " " and ch != "\n" and randf() < 0.3 else ch
+	return out
+
+
+# 로딩 화면 (검은 화면에서 쓴다). 마지막 칸에서 잠깐 멈칫한다.
+func loading(time := 2.0) -> void:
+	busy = true
+	_card.modulate = Color.WHITE
+	_card.modulate.a = 1.0
+	var bar := func(t: float):
+		var n := int(t * 10)
+		_card.text = "로딩 중...\n\n[" + "■".repeat(n) + "□".repeat(10 - n) + "]"
+	var tw := create_tween()
+	tw.tween_method(bar, 0.0, 0.9, time * 0.6)
+	tw.tween_interval(time * 0.3)
+	tw.tween_callback(func(): Game.sfx("sfx_glitch", -10.0))
+	tw.tween_method(bar, 0.9, 1.0, time * 0.1)
+	tw.tween_interval(0.3)
+	tw.tween_property(_card, "modulate:a", 0.0, 0.2)
+	await tw.finished
+	busy = false
+
+
+# 화면이 지직거린다 (가로 줄무늬 + 점). 게임 화면 위, 대화창 아래에 그려진다.
+func static_noise(time := 0.4) -> void:
+	Game.sfx("sfx_glitch", -6.0)
+	_static_left = time
+	_static.show()
+	_static.queue_redraw()
+
+
+func _draw_static() -> void:
+	for i in 7:
+		var y := randi_range(0, 176)
+		_static.draw_rect(Rect2(0, y, 320, randi_range(1, 4)), Color(randf(), randf() * 0.3, randf(), 0.35))
+	for i in 90:
+		var c := randf()
+		_static.draw_rect(Rect2(randi_range(0, 318), randi_range(0, 178), 2, 1), Color(c, c, c, 0.6))
 
 
 # ---------- 지도 ----------

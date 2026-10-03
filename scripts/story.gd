@@ -1,8 +1,9 @@
 # 날짜별 이야기 파일(day1.gd, day2.gd ...)을 골라 주고, 날마다 똑같은 것(물건 설명, 하루 끝)을 맡는다.
 # 새 날을 만들려면: dayN.gd 를 만들고 아래 DAYS 에 한 줄 추가.
+# (dayN.gd 맨 위 상수들: NIGHT_WHISPER, END_TEXT, END_GLITCH, TINT, WHISPERS, WHISPER_GAP)
 extends RefCounted
 
-const DAYS := [preload("res://scripts/day1.gd"), preload("res://scripts/day2.gd")]
+const DAYS := [preload("res://scripts/day1.gd"), preload("res://scripts/day2.gd"), preload("res://scripts/day3.gd")]
 
 
 static func cur() -> GDScript:
@@ -13,9 +14,12 @@ static func objectives() -> Array: return cur().objectives()
 static func marker_char() -> String: return cur().marker_char()
 static func door(ch: String) -> bool: return await cur().door(ch)
 static func on_step(world) -> void: await cur().on_step(world)
+static func tint() -> Color: return cur().TINT
 
 
 static func on_enter(world) -> void:
+	Game.whisper_lines = cur().WHISPERS
+	Game.whisper_gap = cur().WHISPER_GAP
 	Game.whispers(cur().whispers_on())
 	await cur().on_enter(world)
 
@@ -56,7 +60,7 @@ static func sleep(world) -> void:
 	Game.stop_bgm()
 	await UI.fade(true, 1.2)
 	UI.hud(false)
-	await UI.card("%d일차 끝" % Game.day, 1.6)
+	await UI.card(cur().END_TEXT, 1.6, cur().END_GLITCH)
 	Game.whisper_now(cur().NIGHT_WHISPER)
 	await world.get_tree().create_timer(2.5).timeout
 	Game.best_day = maxi(Game.best_day, Game.day)

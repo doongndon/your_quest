@@ -24,6 +24,7 @@ var moving := false
 var acting := false
 var marker := Sprite2D.new()
 var cam := Camera2D.new()
+var tint := CanvasModulate.new()
 var _step_count := 0
 
 
@@ -69,12 +70,15 @@ func _ready() -> void:
 	cam.limit_left = 0
 	cam.limit_top = 0
 
-	Game.play_bgm(data.bgm)
-	if Game.flags.get("drowsy"):
-		set_drowsy()
+	add_child(tint)
+	set_tint()
+	Game.play_bgm(data.bgm, data.get("pitch", 1.0))
 	UI.hud(true)
 	refresh()
-	Story.on_enter(self)
+	# 들어오자마자 나오는 이야기가 끝날 때까지는 못 움직인다 (대화가 겹치지 않게)
+	acting = true
+	await Story.on_enter(self)
+	acting = false
 
 
 func _place(ch: String, c: Vector2i) -> void:
@@ -113,7 +117,7 @@ func _process(_delta: float) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	for n in npcs:  # 조잡한 2프레임 숨쉬기 (ISTRUE 는 가끔만 눈이 바뀜)
 		n.frame = int(fmod(t, 3.7) < 0.2) if "istrue" in n.texture.resource_path else int(t * 2) % 2
-	if moving or acting or UI.busy:
+	if moving or acting or UI.busy or Game.travelling:
 		return
 	for d in DIRS:
 		if Input.is_action_pressed(d):
@@ -123,7 +127,7 @@ func _process(_delta: float) -> void:
 
 # 대화창이 먼저 키를 가져가므로, 여기엔 대화 중이 아닐 때 누른 키만 온다
 func _unhandled_input(e: InputEvent) -> void:
-	if moving or acting or UI.busy:
+	if moving or acting or UI.busy or Game.travelling:
 		return
 	if e.is_action_pressed("accept"):
 		_interact()
@@ -181,7 +185,7 @@ func _interact() -> void:
 	var th: Dictionary = things.get(front, {})
 	if th.get("id") == "counter":  # 계산대 너머에 있는 사람에게 말 걸기
 		th = things.get(front + DIRS[facing], {})
-	if th.is_empty() or th.id == "spawn":
+	if th.is_empty() or th.id == "spawn" or (th.sprite and not th.sprite.visible):
 		return
 	acting = true
 	await Story.interact(th.id, self)
@@ -216,6 +220,38 @@ func set_frame(id: String, frame: int) -> void:
 			th.sprite.frame = frame
 
 
+# 물건 보이기/숨기기 (예: 주운 물건 없애기)
+func set_shown(id: String, on: bool) -> void:
+	for th in things.values():
+		if th.id == id and th.sprite:
+			th.sprite.visible = on
+
+
+# 물건 위로 지나갈 수 있는지 바꾸기 (예: 잠긴 문 열기)
+func set_walk(id: String, on: bool) -> void:
+	for th in things.values():
+		if th.id == id:
+			th.walk = on
+
+
+func face(d: String) -> void:
+	facing = d
+	player.frame = ROW[d] * 4
+
+
+# 맵에 없던 캐릭터를 c 칸에 세운다. 길을 막고, 숨쉬기도 한다.
+func spawn_npc(npc: String, id: String, c: Vector2i) -> Sprite2D:
+	var s := Sprite2D.new()
+	s.texture = load("res://assets/sprites/%s.png" % npc)
+	s.hframes = 2
+	s.centered = false
+	s.position = c * T
+	add_child(s)
+	npcs.append(s)
+	things[c] = {"id": id, "ch": "", "walk": false, "sprite": s}
+	return s
+
+
 # 목표 위에 빨간 화살표 띄우기
 func refresh() -> void:
 	var target: String = Story.marker_char()
@@ -226,11 +262,12 @@ func refresh() -> void:
 			marker.visible = true
 
 
-# 졸릴 때: 세상이 어둑해진다 (화면 위 글씨는 그대로)
-func set_drowsy() -> void:
-	var m := CanvasModulate.new()
-	m.color = Color(0.72, 0.68, 0.82)
-	add_child(m)
+# 세상 색: 그날의 어두움(Story.tint) x 졸음. 화면 위 글씨는 그대로.
+# (CanvasModulate 는 한 화면에 하나만 써야 해서 하나로 합친다)
+func set_tint() -> void:
+	tint.color = Story.tint()
+	if Game.flags.get("drowsy"):
+		tint.color *= Color(0.72, 0.68, 0.82)
 
 
 func shake() -> void:

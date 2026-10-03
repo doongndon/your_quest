@@ -3,6 +3,7 @@ extends Node
 
 const SAVE_PATH := "user://save.json"
 const WORLD := preload("res://scenes/world.tscn")
+const Story := preload("res://scripts/story.gd")
 
 var gold := 0
 var day := 1           # 지금 며칠째인지
@@ -12,6 +13,9 @@ var items: Array[String] = []
 var map := "home"
 var arrive := ""       # 도착할 문 글자 ("" = P 위치)
 var best_day := 0      # 저장: 끝낸 날 중 가장 큰 값
+var travelling := false  # 화면 전환 중 (이때는 못 움직인다)
+var whisper_lines := ["...들려?", "여기야", "ㄴr가", "...", "왜 왔어"]  # 그날 들리는 환청 (dayN.gd 의 WHISPERS)
+var whisper_gap := Vector2(25.0, 55.0)  # 환청 사이 간격(초) 최소~최대
 
 var _bgm := AudioStreamPlayer.new()
 var _bgm_name := ""
@@ -112,14 +116,14 @@ func sfx(name: String, volume_db := 0.0) -> void:
 # ---------- 환청 (가끔 들리는 이상한 소리) ----------
 func whispers(on: bool) -> void:
 	if on and _whisper.is_stopped():
-		_whisper.start(randf_range(25.0, 55.0))
+		_whisper.start(randf_range(whisper_gap.x, whisper_gap.y))
 	elif not on:
 		_whisper.stop()
 
 
 func whisper_now(text := "") -> void:
 	sfx("sfx_whisper", -10.0)
-	UI.glitch(text if text else ["...들려?", "여기야", "ㄴr가", "...", "왜 왔어"].pick_random())
+	UI.glitch(text if text else whisper_lines.pick_random())
 
 
 func _on_whisper() -> void:
@@ -132,9 +136,11 @@ func _on_whisper() -> void:
 func go(to_map: String, door := "") -> void:
 	map = to_map
 	arrive = door
+	travelling = true  # 예전엔 페이드 도중에 걷거나 말을 걸 수 있었다
 	await UI.fade(true)
 	get_tree().change_scene_to_packed(WORLD)
 	await get_tree().process_frame
+	travelling = false
 	UI.fade(false)
 
 
@@ -153,8 +159,14 @@ func start_day(n: int) -> void:
 
 func continue_game() -> void:
 	load_save()
-	start_day(day)
+	start_day(resume_day())
 	go("home")
+
+
+# 이어하기 할 날: 끝낸 날의 다음 날 (그날이 아직 없으면 마지막 날)
+# 예전엔 마지막 날을 끝내면 그날이 저장돼서, 새 날이 추가돼도 같은 날을 다시 했다.
+func resume_day() -> int:
+	return clampi(maxi(day, best_day + 1), 1, Story.DAYS.size())
 
 
 # ---------- 저장 ----------
@@ -170,6 +182,6 @@ func load_save() -> void:
 	var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if data is Dictionary:
 		best_day = int(data.get("best_day", 0))
-		day = clampi(int(data.get("day", 1)), 1, best_day + 1)
+		day = clampi(int(data.get("day", 1)), 1, mini(best_day + 1, Story.DAYS.size()))
 		gold = int(data.get("gold", 0))
 		items.assign(data.get("items", []))

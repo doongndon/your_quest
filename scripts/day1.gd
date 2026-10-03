@@ -5,6 +5,11 @@ extends RefCounted
 const GUIDE := "???"
 const SHOP := "ISTRUE"
 const NIGHT_WHISPER := "내일 또 와"
+const END_TEXT := "1일차 끝"
+const END_GLITCH := false
+const TINT := Color.WHITE
+const WHISPERS := ["...들려?", "여기야", "ㄴr가", "...", "왜 왔어"]
+const WHISPER_GAP := Vector2(25.0, 55.0)
 const QUESTS := [["curtain", "커튼 치기"], ["window", "창문 열기"], ["bed", "이불 정리하기"]]
 
 
@@ -128,6 +133,9 @@ static func _istrue(world) -> void:
 	while true:
 		match await UI.choose(SHOP, "뭘 줄까?", ["사탕  10G", "망치  100G", "그만두기"]):
 			0:
+				if Game.gold < 10:
+					await UI.say(SHOP, ["돈이 모자라.", "...이상하네. 분명 있었을 텐데."])
+					continue
 				Game.gold -= 10
 				Game.items.append("candy")
 				Game.sfx("sfx_coin")

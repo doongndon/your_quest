@@ -286,9 +286,53 @@ def sign():
     return rect(a, 7, 10, 2, 6, (130, 90, 60))
 
 
+def candle():
+    a = rect(blank(), 6, 6, 4, 9, (240, 236, 228))
+    rect(a, 5, 14, 6, 2, (150, 150, 160))
+    rect(a, 7, 4, 2, 2, (43, 43, 58))
+    return rect(rect(a, 7, 1, 2, 3, (250, 200, 70)), 7, 2, 2, 1, (250, 120, 60))
+
+
+def pencils():
+    a = blank()
+    for i, c in enumerate([(230, 70, 70), (250, 200, 70), (90, 180, 100), (74, 123, 208)]):
+        x = 3 + i * 3
+        rect(a, x, 4, 2, 9, c); rect(a, x, 13, 2, 1, (242, 201, 160)); rect(a, x, 14, 2, 1, c)
+    return rect(a, 2, 7, 12, 3, (200, 180, 140))
+
+
+def thread():
+    a = rect(blank(), 4, 3, 8, 2, (150, 104, 68))
+    rect(a, 4, 11, 8, 2, (150, 104, 68))
+    rect(a, 5, 5, 6, 6, (220, 80, 110))
+    for y in (6, 8):
+        rect(a, 5, y, 6, 1, (250, 150, 180))
+    return rect(a, 11, 9, 3, 1, (220, 80, 110))
+
+
+def trapdoor():
+    a = rect(blank(), 1, 2, 14, 12, (60, 44, 34))
+    rect(a, 2, 3, 12, 10, (96, 70, 50))
+    for y in (6, 9):
+        rect(a, 2, y, 12, 1, (60, 44, 34))
+    return rect(a, 7, 7, 2, 2, (150, 150, 160))
+
+
+def box():
+    a = rect(blank(), 1, 3, 14, 12, (170, 130, 80))
+    rect(a, 1, 3, 14, 2, (200, 160, 100))
+    return rect(a, 7, 3, 2, 12, (140, 104, 64))
+
+
+def sofa():
+    a = rect(blank(), 0, 3, 16, 11, (120, 90, 140))
+    rect(a, 2, 7, 12, 5, (150, 116, 170))
+    return rect(rect(a, 1, 14, 2, 2, (90, 60, 40)), 13, 14, 2, 2, (90, 60, 40))
+
+
 objs = [curtain(False), curtain(True), window((150, 200, 240)), window((40, 40, 60)), bed(False), bed(True),
         door(), counter(), shelf("candy"), shelf("hammer"), coin(), candy(), hammer(), marker(), table(), plant(),
-        sign()]
+        sign(), candle(), pencils(), thread(), trapdoor(), box(), sofa()]
 objs += [blank()] * (32 - len(objs))
 Image.fromarray(np.vstack([np.hstack(objs[:16]), np.hstack(objs[16:])])).save(os.path.join(SPR, "objects.png"))
 

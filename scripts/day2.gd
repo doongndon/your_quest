@@ -5,6 +5,11 @@ extends RefCounted
 const GUIDE := "???"
 const SHOP := "ISTRUE"
 const NIGHT_WHISPER := "봤지?"
+const END_TEXT := "2일차 끝"
+const END_GLITCH := false
+const TINT := Color.WHITE
+const WHISPERS := ["...들려?", "여기야", "ㄴr가", "...", "왜 왔어", "봤어?"]
+const WHISPER_GAP := Vector2(20.0, 45.0)
 const LAPS := 3
 
 
@@ -117,9 +122,12 @@ static func interact(id: String, world) -> bool:
 	match id:
 		"guide": await _guide(world)
 		"istrue":
-			if Game.step != 3:
+			if Game.step < 3:  # 퀘스트 전엔 아직 안 판다 (기본 대사 "오늘은 더 팔 게 없어"와 안 맞아서)
+				await UI.say(SHOP, ["또 왔네.", "...퀘스트는 끝냈어?", "끝내고 와. 그때 팔게."])
+			elif Game.step == 3:
+				await _istrue(world)
+			else:
 				return false
-			await _istrue(world)
 		_: return false
 	return true
 
@@ -158,6 +166,9 @@ static func _istrue(world) -> void:
 	while true:
 		match await UI.choose(SHOP, "뭘 줄까?", ["사탕  10G", "망치  100G", "그만두기"]):
 			0:
+				if Game.gold < 10:
+					await UI.say(SHOP, ["돈이 모자라.", "...이상하네. 분명 있었을 텐데."])
+					continue
 				Game.gold -= 10
 				Game.sfx("sfx_coin")
 				UI.refresh()
@@ -166,7 +177,7 @@ static func _istrue(world) -> void:
 				Game.flags.drowsy = true
 				Game.step = 4
 				Game.whispers(false)
-				world.set_drowsy()
+				world.set_tint()
 				UI.refresh()
 				world.refresh()
 				return

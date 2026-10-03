@@ -18,7 +18,7 @@ func _ready() -> void:
 	_label("YOUR QUEST", Vector2(0, 40), 20, Color("f0ece4"), preload("res://assets/fonts/Galmuri11.ttf"))
 	_label("v0.1  (미완성)", Vector2(0, 66), 10, Color("8a8aa0"))
 	if Game.best_day > 0:
-		_menu.push_front("이어하기 (%d일차)" % Game.day)
+		_menu.push_front("이어하기 (%d일차)" % Game.resume_day())
 	_label("플레이 수 0명  ·  후기 0개" if Game.best_day == 0 else "%d일차 클리어!" % Game.best_day, Vector2(0, 162), 10, Color("5a5a70"))
 	for i in _menu.size():
 		_items.append(_label("", Vector2(0, 100 + i * 16), 10, Color.WHITE))
@@ -74,5 +74,5 @@ func _intro() -> void:
 func _continue() -> void:
 	Game.stop_bgm()
 	await UI.fade(true, 0.6)
-	await UI.card("%d일차" % Game.day, 1.2)
+	await UI.card("%d일차" % Game.resume_day(), 1.2)
 	Game.continue_game()
